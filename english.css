@@ -1,0 +1,69 @@
+
+/* KHOTWA English Journey — isolated styles, inherits the app palette */
+.eng-root{display:grid;gap:20px;min-width:0}
+.eng-root .page-head{margin-bottom:0}
+.eng-root .page-head p{max-width:650px}
+.eng-hero{position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(circle at 10% 15%,#6abf9a29,transparent 42%),linear-gradient(135deg,#172c2a,#151e2c);border:1px solid #35594d;border-radius:24px;padding:27px}
+.light .eng-hero{background:linear-gradient(135deg,#e5f6ee,#eaf2fb);border-color:#c2ded1}
+.eng-hero::after{content:'EN';position:absolute;left:2%;top:-30px;font-size:170px;line-height:1;font-weight:900;letter-spacing:-12px;opacity:.055;z-index:-1}
+.eng-hero-upper{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.eng-pill{display:inline-block;border:1px solid #638e7966;border-radius:25px;padding:6px 11px;font-size:12px;color:var(--accent);background:var(--accentdeep);font-weight:750}
+.eng-hero h2{font-size:clamp(22px,3.5vw,30px);margin-bottom:10px}
+.eng-hero p{line-height:1.85;color:var(--muted);max-width:700px;font-size:14px}
+.eng-hero p strong{color:var(--text)}
+.eng-figures{display:flex;gap:9px;flex-wrap:wrap;margin:22px 0 14px}
+.eng-figures>div{min-width:110px;background:#00000020;border:1px solid #a9edbc24;padding:11px 17px;border-radius:13px;display:grid;gap:4px}
+.light .eng-figures>div{background:#ffffff98}
+.eng-figures b{font-size:22px;font-variant-numeric:tabular-nums}
+.eng-figures span{font-size:11px;color:var(--muted)}
+.eng-progress{height:9px;border-radius:18px;background:var(--panel3);overflow:hidden;border:1px solid var(--line)}
+.eng-progress span{display:block;height:100%;background:linear-gradient(90deg,#64b995,#b5f3be);transition:width .2s ease}
+.eng-hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:17px}
+.eng-muted{font-size:12px;color:var(--muted);line-height:1.8}
+.eng-columns{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(225px,.9fr);gap:18px;align-items:start}
+.eng-main,.eng-aside{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px}
+.eng-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;margin-bottom:17px}
+.eng-section-head h2{font-size:22px}
+.eng-section-head h2 small{font-size:12px;color:var(--muted);display:block;font-weight:500;direction:ltr;text-align:right;margin-top:5px;font-variant-numeric:tabular-nums}
+.eng-section-head h3{font-size:16px}
+.eng-video{position:relative;aspect-ratio:16/9;background:linear-gradient(145deg,#1d3540,#0a131c);border:1px solid #34524b;border-radius:16px;overflow:hidden;display:grid;place-items:center}
+.eng-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.eng-video-placeholder{display:grid;justify-items:center;gap:8px;text-align:center;padding:16px}
+.eng-video-placeholder p{font-size:12px;color:#bccdd6;line-height:1.6}
+.eng-video-placeholder h3{color:#f4faf8}
+.eng-play-symbol{display:grid;place-items:center;border:1px solid #a9edbc4a;background:#a9edbc28;color:#aff4bb;width:56px;height:56px;border-radius:50%;font-size:20px}
+.eng-tools{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0 7px}
+.eng-tools .btn{font-size:12px}
+.eng-sessions{display:grid;gap:8px}
+.eng-segment{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);padding:10px 12px}
+.eng-segment.is-done{border-color:#50886d88;background:color-mix(in srgb,var(--accentdeep) 55%,var(--panel))}
+.eng-segment-details{display:grid;gap:4px;min-width:0}
+.eng-segment-details b{font-size:13px}
+.eng-segment-details span{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.eng-segment-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.eng-segment-actions .btn{font-size:11px;white-space:normal}
+.eng-study-box{background:var(--panel2);border:1px solid var(--line);border-radius:15px;padding:16px;margin-top:16px;display:grid;gap:11px}
+.eng-study-box label{font-size:13px}
+.eng-study-box textarea{min-height:95px}
+.eng-practice{display:flex;align-items:center;gap:10px;line-height:1.65;cursor:pointer}
+.eng-practice input{width:19px;height:19px;min-height:0;flex:none;accent-color:var(--accent)}
+.eng-move{display:flex;justify-content:space-between;gap:10px;margin-top:17px}
+.eng-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.eng-day{min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:13px;color:var(--text);padding:12px;text-align:right;display:grid;gap:7px}
+.eng-day.selected{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accentdeep)}
+.eng-day.finished{background:color-mix(in srgb,var(--accentdeep) 70%,var(--panel2))}
+.eng-day-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.eng-day-top b{font-size:13px}
+.eng-day-top span{font-size:11px;color:var(--accent)}
+.eng-day small{font-size:10px;color:var(--muted);direction:ltr;text-align:right}
+.eng-setting{border-top:1px solid var(--line);margin-top:23px;padding-top:20px}
+.eng-setting h3{font-size:15px}
+.eng-setting p,.eng-note{color:var(--muted);font-size:12px;line-height:1.85;margin-top:9px}
+.eng-setting form{margin-top:14px}
+.eng-setting label{display:block;font-size:12px;margin-bottom:7px}
+.eng-duration-row{display:flex;gap:8px}
+.eng-duration-row input{flex:1;min-width:0}
+.eng-note{padding:13px;border:1px dashed var(--line);border-radius:12px}
+@media(max-width:970px){.eng-columns{grid-template-columns:1fr}.eng-days{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:740px){.bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.bottom-nav .navbtn{font-size:9px;padding-inline:1px}.eng-hero{padding:20px 16px}.eng-main,.eng-aside{padding:14px}.eng-days{grid-template-columns:repeat(3,minmax(0,1fr))}.eng-figures>div{flex:1;min-width:85px;text-align:center;padding:10px 7px}.eng-hero::after{font-size:110px;top:5px}.eng-segment{flex-wrap:wrap}.eng-segment-actions{width:100%;justify-content:flex-start}.eng-tools .btn{flex-grow:1}.eng-root .page-head h1{font-size:25px}}
+@media(max-width:400px){.eng-days{grid-template-columns:repeat(2,minmax(0,1fr))}.eng-segment-actions .btn{flex:1}}
