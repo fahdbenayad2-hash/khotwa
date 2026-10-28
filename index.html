@@ -14,8 +14,13 @@
 @media(max-width:1000px){.shell{grid-template-columns:210px minmax(0,1fr)}.sidebar{padding:25px 13px}.cards-2{grid-template-columns:1fr}.aside-note{display:none}}
 @media(max-width:740px){.shell{display:block}.sidebar{display:none}.topbar{height:67px;padding:0 18px}.topbar .date-pill{display:none}.content{padding:28px 16px 103px}.page-head{margin-bottom:22px}.page-head h1{font-size:27px}.hero{padding:22px 18px;border-radius:19px}.hero h2{font-size:23px}.primary-card{padding:18px;margin-top:20px}.primary-actions{align-items:stretch}.primary-actions .btn{width:100%}.quick-add input{min-width:0}.quick-add .btn{padding:10px 14px}.panel{padding:17px;border-radius:17px}.section-title{margin:24px 0 12px}.project-grid{grid-template-columns:1fr}.bottom-nav{position:fixed;z-index:18;bottom:0;left:0;right:0;background:color-mix(in srgb,var(--panel) 96%,transparent);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:8px 5px calc(7px + env(safe-area-inset-bottom));backdrop-filter:blur(15px)}.bottom-nav .navbtn{padding:6px 0;display:flex;flex-direction:column;gap:4px;font-size:10px;border-radius:9px}.bottom-nav .navbtn svg{width:19px;height:19px}.toast{bottom:88px}.page-head{flex-wrap:wrap}.modal{padding:19px;border-radius:18px}.modal-overlay{align-items:end;padding:0}.modal{width:100%;max-height:94dvh;border-radius:22px 22px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom))}.task-tools{gap:0}.task-row{gap:9px;padding:11px}.form-2{grid-template-columns:1fr}.focus-actions .btn{flex:1}.tiny-grid{gap:6px}.metric{padding:13px 5px}.metric strong{font-size:22px}.setting-row{align-items:flex-start;flex-direction:column}.session-options{gap:6px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* KHOTWA 1.1 — compact, optional data safety reminder */
+.backup-reminder{margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;font-size:12px;color:var(--muted)}
+.backup-reminder .btn{margin-inline-start:auto}
+@media(max-width:520px){.primary-actions{flex-wrap:wrap}.primary-actions .btn.primary{flex:1;min-width:150px}}
 </style>
-  <title>خُطوة | KHOTWA</title>
+  <title>خُطوة | KHOTWA v1.1</title>
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -26,7 +31,7 @@
 <script>/* KHOTWA persistence: IndexedDB primary; localStorage fallback for unsupported/opaque origins. */
 window.KhotwaDB = (() => {
   const DB_NAME='khotwa-database';
-  const VERSION=1;
+  const VERSION=2;
   const TABLES=['tasks','projects','habits','habitLogs','sessions','reviews','meta'];
   let db=null;
   let fallback=false;
@@ -41,9 +46,10 @@ window.KhotwaDB = (() => {
   }
   function localWrite(table,record,del) {
     const data=localRead();
-    data[table]=data[table].filter(x=>x.id!==record.id);
-    if (!del) data[table].push(structuredClone(record));
-    try {localStorage.setItem('khotwa-local-data',JSON.stringify(data));}
+    const next=structuredClone(data);
+    next[table]=next[table].filter(x=>x.id!==record.id);
+    if (!del) next[table].push(structuredClone(record));
+    try {localStorage.setItem('khotwa-local-data',JSON.stringify(next));fallbackCache=next;}
     catch (err) { throw Error('فشل حفظ البيانات على الجهاز؛ تحقق من مساحة التخزين.'); }
   }
   async function open(){
@@ -51,12 +57,30 @@ window.KhotwaDB = (() => {
     try {
       db=await new Promise((resolve,reject)=>{
         const request=indexedDB.open(DB_NAME,VERSION);
-        request.onupgradeneeded=()=>{const database=request.result; for (const table of TABLES) if (!database.objectStoreNames.contains(table)) database.createObjectStore(table,{keyPath:'id'});};
+        request.onupgradeneeded=()=>{
+          const database=request.result, tx=request.transaction;
+          for(const table of TABLES){
+            if(!database.objectStoreNames.contains(table))database.createObjectStore(table,{keyPath:'id'});
+          }
+          // Non-destructive migration from the original v1 stores.
+          if((request.transaction?.db?.version || VERSION)>=2){
+            const indexes={tasks:['plannedDate','projectId','status'],sessions:['startedAt','endedAt'],habitLogs:['date']};
+            for(const [table,keys] of Object.entries(indexes)){
+              const store=tx.objectStore(table);
+              for(const key of keys)if(!store.indexNames.contains(key))store.createIndex(key,key,{unique:false});
+            }
+          }
+        };
         request.onsuccess=()=>resolve(request.result);
         request.onerror=()=>reject(request.error);
         request.onblocked=()=>reject(Error('قاعدة البيانات مستعملة من نافذة أخرى'));
       });
-    } catch (err) {fallback=true; localRead(); console.warn('IndexedDB unavailable; using localStorage:',err);}
+    } catch (err) {
+      // Existing IndexedDB records must never silently be replaced by an empty fallback.
+      if(err?.name==='SecurityError'||err?.name==='InvalidStateError'){
+        fallback=true;localRead();console.warn('IndexedDB denied; using localStorage:',err);
+      }else throw Error('تعذر فتح قاعدة البيانات. اغلق نوافذ خُطوة الأخرى وحدّث الصفحة. '+(err?.message||''));
+    }
   }
   async function all(table) {
     if (!TABLES.includes(table)) throw Error('Invalid table');
@@ -89,9 +113,10 @@ window.KhotwaDB = (() => {
   }
   async function replaceAll(content) {
     if (fallback) {
-      fallbackCache={};
-      for (const table of TABLES) fallbackCache[table]=structuredClone(content[table]||[]);
-      localStorage.setItem('khotwa-local-data',JSON.stringify(fallbackCache));
+      const next={};
+      for(const table of TABLES)next[table]=structuredClone(content[table]||[]);
+      localStorage.setItem('khotwa-local-data',JSON.stringify(next));
+      fallbackCache=next;
       return;
     }
     return new Promise((resolve,reject)=>{
@@ -114,7 +139,7 @@ const DB=window.KhotwaDB;
 const tables=DB.TABLES;
 const state={tasks:[],projects:[],habits:[],habitLogs:[],sessions:[],reviews:[],meta:[]};
 let page='today', projectDetail=null, inboxFilter='open', toastTimer=null, focusInterval=null;
-let modal=null, active=null, theme='dark';
+let modal=null, active=null, theme='dark', timerAnchor=null;
 const $=sel=>document.querySelector(sel);
 const today=()=>localDate(new Date());
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -162,6 +187,12 @@ function currentPrimary(){return assignedToday().find(t=>t.role==='primary')||as
 function namedProject(id){return state.projects.find(p=>p.id===id)?.name||'';}
 function doneToday(){return state.tasks.filter(t=>t.status==='done'&&t.completedAt&&localDate(new Date(t.completedAt))===today());}
 function atTask(id){return state.tasks.find(t=>t.id===id);}
+function backupDue(){
+ const earliest=state.tasks.concat(state.projects,state.habits,state.sessions).map(x=>Date.parse(x.createdAt||x.startedAt)).filter(Number.isFinite).sort((a,b)=>a-b)[0];
+ if(!earliest||Date.now()-earliest<14*86400000)return false;
+ const last=Date.parse(getMeta('lastBackupAt')||getMeta('backupReminderDismissedAt')||0);
+ return !Number.isFinite(last)||Date.now()-last>=14*86400000;
+}
 function navButton(id,label,icon){return `<button class="navbtn ${page===id?'active':''}" data-action="nav" data-page="${id}" aria-current="${page===id?'page':'false'}">${ic(icon)}<span>${label}</span></button>`;}
 function shell(body){
  const navs=[['today','اليوم','today'],['inbox','المهام','inbox'],['projects','مشاريعي','projects'],['progress','تقدّمي','progress'],['settings','الإعدادات','settings']];
@@ -190,10 +221,10 @@ function todayView(){
  const list=assignedToday(),primary=currentPrimary(),others=list.filter(t=>t.id!==primary?.id),done=doneToday();
  const heroPrimary=primary?`<div class="primary-card"><div class="primary-top"><span class="mini-tag">✦ الأهم الآن</span><button class="mini-icon" style="color:var(--accent)" data-action="task-edit" data-id="${attr(primary.id)}" aria-label="تعديل المهمة">${ic('edit')}</button></div>
  <h3>${esc(primary.title)}</h3><p class="next-step">${primary.nextStep?`الخطوة التالية: ${esc(primary.nextStep)}`:'حدّد خطوة صغيرة، أو ابدأ كما أنت.'}</p>
- <div class="primary-actions"><span class="hintline">${ic('clock',14)} ابدأ حتى بخمس دقائق</span><button class="btn primary" data-action="focus-setup" data-id="${attr(primary.id)}">${ic('play')} ابدأ التركيز</button></div></div>`:
+ <div class="primary-actions"><span class="hintline">${ic('clock',14)} خطوة واحدة تكفي للبداية</span><button class="btn tiny secondary" data-action="focus-setup" data-id="${attr(primary.id)}">خيارات المدة</button><button class="btn primary" data-action="focus-quick" data-id="${attr(primary.id)}">${ic('play')} ابدأ 5 دقائق</button></div></div>`:
  `<div class="primary-card"><div class="primary-top"><span class="mini-tag">✦ بداية جديدة</span></div><h3>ما كاش مهمة أساسية اليوم.</h3><p class="next-step">اكتب أول خطوة في الأسفل، أو اختَر مهمة من صندوق المهام.</p><div class="primary-actions"><span class="hintline">مش لازم خطة كبيرة باش تبدأ.</span><button class="btn primary" data-action="nav" data-page="inbox">${ic('inbox')} شوف مهامك</button></div></div>`;
  return header('مساحتك الهادئة','صباح / مساء الخير ✨','ما تحتاجش تنجز كل شيء اليوم. ركّز على الخطوة اللي قدامك.')+
- `<section class="hero"><div class="hero-label">${ic('spark',15)} يوم جديد، خطوة واحدة</div><h2>واش هي أهم حاجة حاب تتقدم فيها اليوم؟</h2><p>اختار حاجة عندها معنى بالنسبة ليك. الباقي يقدر يستنى.</p>${heroPrimary}${quickForm('اكتب مهمة جديدة أو فكرة...')}<div class="status-caption">إذا عندك مهمة أساسية، الأفكار الجديدة تروح لصندوق المهام تلقائياً.</div></section>
+ `<section class="hero"><div class="hero-label">${ic('spark',15)} يوم جديد، خطوة واحدة</div><h2>واش هي أهم حاجة حاب تتقدم فيها اليوم؟</h2><p>اختار حاجة عندها معنى بالنسبة ليك. الباقي يقدر يستنى.</p>${heroPrimary}${quickForm('اكتب مهمة جديدة أو فكرة...')}<div class="status-caption">نضيف المهام لليوم حتى 3 فقط؛ الباقي يتحفظ في صندوق المهام.</div>${backupDue()?`<div class="backup-reminder" role="status">${ic('shield',16)} بياناتك مهمة. صدّر نسخة احتياطية دورية. <button class="btn tiny secondary" data-action="export">تصدير الآن</button><button class="mini-icon" data-action="backup-dismiss" aria-label="تذكيري لاحقاً">${ic('x',15)}</button></div>`:''}</section>
  <div class="cards-2"><section><div class="section-title"><h2>بقية خطوات اليوم <span class="muted-small">(${others.length}/2)</span></h2><button class="btn tiny ghost" data-action="nav" data-page="inbox">كل المهام ${ic('chevron',15)}</button></div>
  <div class="task-list">${others.length?others.map(t=>taskRow(t)).join(''):noData('☁','مساحة للتنفس','ماشي لازم تزيد مهام أخرى لليوم.')} ${done.length?`<div class="section-title"><h2>أنجزتها اليوم ✨</h2></div>${done.slice(0,5).map(t=>taskRow(t)).join('')}`:''}</div></section>
  <aside><div class="section-title"><h2>إذا تشتّت...</h2></div><div class="panel"><div class="rescue"><div class="rescue-mark">${ic('refresh',22)}</div><div><h3>ارجع بخطوة صغيرة</h3><p>ضعت أو ما قدرتش تبدأ؟ نرجعوك لنفس المهمة بخطوة صغيرة، بلا ضغط.</p></div></div><button class="btn secondary full" data-action="rescue">${ic('spark')} أعطيني دقيقتين فقط</button></div>
@@ -251,7 +282,7 @@ function settingsView(){return header('ملكك وحدك','الإعدادات و
  <div class="setting-row"><div><div class="setting-title">استعادة نسخة احتياطية</div><p class="setting-desc">الاستيراد يستبدل بيانات هذا المتصفح بالكامل بعد التأكيد.</p></div><button class="btn secondary" data-action="import">${ic('upload')} استيراد</button><input class="hidden-file" type="file" id="import-file" accept=".json,application/json" /></div>
  <div class="setting-row"><div><div class="setting-title">مكان الحفظ الحالي</div><p class="setting-desc">${DB.fallback?'تخزين محلي احتياطي (localStorage).':'قاعدة بيانات المتصفح (IndexedDB).'} لا توجد مزامنة مع الحاسوب أو أجهزة أخرى.</p></div><span class="chip">${ic('shield',14)} محلي</span></div></div>
  <div class="panel settings-panel"><h2>بداية نظيفة</h2><div class="setting-row"><div><div class="setting-title">مسح جميع البيانات</div><p class="setting-desc">عملية نهائية. صدّر نسخة احتياطية قبل المتابعة إذا كنت تحتاج بياناتك.</p></div><button class="btn danger" data-action="reset">${ic('trash')} مسح البيانات</button></div></div>
- <p class="muted-small">خُطوة v1.0 — يعمل على نفس الجهاز والمتصفح. التثبيت والعمل دون إنترنت متاحان في المتصفحات الداعمة عبر HTTPS أو localhost بعد فتح الموقع أول مرة.</p>`;}
+ <p class="muted-small">خُطوة v1.1 — يعمل على نفس الجهاز والمتصفح. التثبيت والعمل دون إنترنت متاحان في المتصفحات الداعمة عبر HTTPS أو localhost بعد فتح الموقع أول مرة.</p>`;}
 function render(){
  const body=({today:todayView,inbox:inboxView,projects:projectsView,progress:progressView,settings:settingsView}[page]||todayView)();
  $('#app').innerHTML=shell(body);
@@ -329,16 +360,20 @@ async function scheduleToday(t,asPrimary=false){
 async function addQuick(title,where){
  const clean=titleCase(title);if(!clean)return;
  const obj={id:uid(),title:clean,nextStep:'',projectId:null,deadline:null,role:'secondary',plannedDate:null,status:'todo',createdAt:now(),updatedAt:now(),completedAt:null};
- if(where==='today'&&!currentPrimary())await scheduleToday(obj,true);
+ if(where==='today'&&assignedToday().length<3){
+   await scheduleToday(obj,!currentPrimary());
+ }
  await persist('tasks',obj);
- render();notify(obj.plannedDate===today()?'أضفنا خطوتك لليوم.':'تسجلت في صندوق المهام.');
+ render();notify(obj.plannedDate===today()?'أضفنا خطوتك لليوم.':where==='today'?'اليوم مكتمل بثلاث خطوات؛ حفظنا المهمة في الصندوق.':'تسجلت في صندوق المهام.');
 }
+function clockNow(){return timerAnchor?timerAnchor.wall+(performance.now()-timerAnchor.mono):Date.now();}
+function resetTimerAnchor(){timerAnchor={wall:Date.now(),mono:performance.now()};}
 function secondsRemaining(){
  if(!active)return 0;
- const elapsed=((active.pausedAt||Date.now())-active.startedAt-active.pausedMs)/1000;
+ const elapsed=((active.pausedAt||clockNow())-active.startedAt-active.pausedMs)/1000;
  return Math.max(0,Math.ceil(active.durationSec-elapsed));
 }
-function actualSeconds(){return Math.max(0,Math.floor(((active?.pausedAt||Date.now())-active.startedAt-active.pausedMs)/1000));}
+function actualSeconds(){return active?Math.max(0,Math.floor(((active.pausedAt||clockNow())-active.startedAt-active.pausedMs)/1000)):0;}
 function formatClock(sec){const m=Math.floor(sec/60),s=sec%60;return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
 function updateTimer(){
  if(!active)return;
@@ -346,18 +381,23 @@ function updateTimer(){
  if(clock)clock.textContent=formatClock(remaining);
  if(remaining===0&&!active.finished){active.finished=true;setMeta('focus',active).then(()=>render()).catch(errorToast);}
 }
-async function startFocus(){
+async function launchFocus(taskId,step,durationSec){
  if(active){notify('عندك جلسة جارية بالفعل.');return;}
- let step=$('#focus-step')?.value.trim()||'';
- const target=atTask(modal.id);
- if(!step)step=target?.title||'خطوة صغيرة';
- active={taskId:modal.id||null,step,durationSec:modal.duration*60,startedAt:Date.now(),pausedMs:0,pausedAt:null,finished:false};
- await setMeta('focus',active);closeModal();render();startTick();
+ const task=atTask(taskId);
+ active={taskId:taskId||null,step:(step||task?.nextStep||task?.title||'خطوة صغيرة').trim(),durationSec,startedAt:Date.now(),pausedMs:0,pausedAt:null,finished:false};
+ resetTimerAnchor();
+ try{await setMeta('focus',active);}catch(err){active=null;throw err;}
+ closeModal();render();startTick();
+}
+async function startFocus(){
+ if(!modal||modal.type!=='focus')return;
+ await launchFocus(modal.id,$('#focus-step')?.value.trim(),modal.duration*60);
 }
 function startTick(){clearInterval(focusInterval);focusInterval=setInterval(()=>{if(active)updateTimer();},500);}
 async function togglePause(){
  if(!active||active.finished)return;
- if(active.pausedAt){active.pausedMs+=Date.now()-active.pausedAt;active.pausedAt=null;}else active.pausedAt=Date.now();
+ if(active.pausedAt){active.pausedMs+=Math.max(0,Date.now()-active.pausedAt);active.pausedAt=null;resetTimerAnchor();}
+ else active.pausedAt=clockNow();
  await setMeta('focus',active);render();
 }
 async function finishFocus(){if(!active)return;active.finished=true;await setMeta('focus',active);render();}
@@ -373,10 +413,17 @@ async function closeFocus(outcome){
  }
 }
 function errorToast(err){console.error(err);notify(err?.message||'صار خطأ أثناء الحفظ. حاول مرة أخرى.');}
-function jsonBackup(){const result={app:'KHOTWA',version:1,exportedAt:now()};for(const t of tables)result[t]=state[t];return result;}
-function exportFile(){const json=JSON.stringify(jsonBackup(),null,2);const blob=new Blob([json],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`khotwa-backup-${today()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);notify('تم تنزيل نسختك الاحتياطية.');}
+function jsonBackup(){const result={app:'KHOTWA',version:2,schemaVersion:2,exportedAt:now()};for(const t of tables)result[t]=state[t];return result;}
+async function exportFile(){
+ const json=JSON.stringify(jsonBackup(),null,2);
+ const blob=new Blob([json],{type:'application/json;charset=utf-8'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+ a.href=url;a.download=`khotwa-backup-${today()}.json`;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),10000);
+ await setMeta('lastBackupAt',now());
+ render();notify('بدأ تنزيل النسخة الاحتياطية. تأكد من حفظ الملف في مكان آمن.');
+}
 function validateBackup(data){
- if(!data||data.app!=='KHOTWA'||data.version!==1)throw Error('هذا الملف ليس نسخة KHOTWA v1 صالحة.');
+ if(!data||data.app!=='KHOTWA'||![1,2].includes(data.version)|| (data.schemaVersion!==undefined&&![1,2].includes(data.schemaVersion)))throw Error('نسخة غير متوافقة. نقبل نسخ KHOTWA v1 وv2 فقط.');
  const out={};let count=0;
  for(const table of tables){
   if(!Array.isArray(data[table]))throw Error('النسخة ناقصة أو غير صحيحة: '+table);
@@ -392,6 +439,11 @@ function validateBackup(data){
  for(const p of out.projects)if(typeof p.name!=='string'||p.name.length>2000)throw Error('نسخة المشاريع غير صالحة.');
  for(const h of out.habits)if(typeof h.title!=='string'||h.title.length>2000)throw Error('نسخة العادات غير صالحة.');
  for(const r of out.sessions)if(!Number.isFinite(r.actualMinutes)||r.actualMinutes<0||r.actualMinutes>1440)throw Error('نسخة الجلسات غير صالحة.');
+ for(const t of out.tasks){
+   if(t.plannedDate!=null&&!/^\d{4}-\d{2}-\d{2}$/.test(t.plannedDate))throw Error('تاريخ مهمة غير صالح.');
+   if(t.nextStep!=null&&typeof t.nextStep!=='string')throw Error('خطوة مهمة غير صالحة.');
+ }
+ for(const m of out.meta)if(m.id==='focus'&&m.value!=null&&(!Number.isFinite(m.value.startedAt)||!Number.isFinite(m.value.durationSec)||m.value.durationSec<=0||m.value.durationSec>86400))throw Error('جلسة التركيز في النسخة غير صالحة.');
  return out;
 }
 async function importFile(file){
@@ -399,12 +451,17 @@ async function importFile(file){
  if(file.size>3*1024*1024)throw Error('الملف كبير جداً. أقصى حجم 3MB.');
  const text=await file.text();let data;try{data=JSON.parse(text);}catch(_){throw Error('الملف JSON غير صالح.');}
  const validated=validateBackup(data);
- if(!confirm('سيتم استبدال جميع البيانات الحالية بالنسخة الموجودة في الملف. هل تريد المتابعة؟'))return;
+ if(state.tasks.length||state.projects.length||state.sessions.length||state.habits.length){
+  if(!confirm('الاستيراد سيستبدل بياناتك الحالية. ننصح بتنزيل نسخة احتياطية الآن. هل تريد تنزيلها قبل المتابعة؟'))return;
+  await exportFile();
+ }
+ if(!confirm('تأكد أنك حفظت النسخة الاحتياطية قبل الاستبدال. هل تريد استيراد الملف الآن؟'))return;
  await DB.replaceAll(validated);
  for(const t of tables)state[t]=await DB.all(t);
  theme=getMeta('theme')==='light'?'light':'dark';document.documentElement.classList.toggle('light',theme==='light');
  active=getMeta('focus')||null;
  if(active&&(!Number.isFinite(active.startedAt)||!Number.isFinite(active.durationSec)))active=null;
+ resetTimerAnchor();
  page='today';projectDetail=null;render();if(active)startTick();notify('تم استرجاع النسخة الاحتياطية بنجاح.');
 }
 async function clearEverything(){
@@ -436,6 +493,8 @@ async function handleAction(action,node){
  case 'habit-toggle':{const key=`${id}|${today()}`;if(state.habitLogs.some(l=>l.id===key))await erase('habitLogs',key);else await persist('habitLogs',{id:key,habitId:id,date:today(),createdAt:now()});render();break;}
  case 'inbox-filter':inboxFilter=node.dataset.value;render();break;
  case 'focus-setup':openModal({type:'focus',id,duration:5,rescue:false});break;
+ case 'focus-quick':{const task=atTask(id);if(task)await launchFocus(task.id,task.nextStep||task.title,300);break;}
+ case 'backup-dismiss':await setMeta('backupReminderDismissedAt',now());render();break;
  case 'rescue':{const t=currentPrimary()||assignedToday()[0]||activeTasks()[0];if(t)openModal({type:'focus',id:t.id,duration:2,rescue:true});else openModal({type:'task'});break;}
  case 'duration':modal.draftStep=$('#focus-step')?.value;modal.duration=Number(node.dataset.duration);drawModal();break;
  case 'focus-start':await startFocus();break;
@@ -443,7 +502,7 @@ async function handleAction(action,node){
  case 'focus-finish':await finishFocus();break;
  case 'focus-end':await closeFocus(node.dataset.outcome);break;
  case 'modal-close':closeModal();break;
- case 'export':exportFile();break;
+ case 'export':await exportFile();break;
  case 'import':$('#import-file')?.click();break;
  case 'reset':await clearEverything();break;
  }
@@ -480,6 +539,7 @@ async function boot(){
   document.documentElement.classList.toggle('light',theme==='light');
   active=getMeta('focus')||null;
   if(active&&(!Number.isFinite(active.startedAt)||!Number.isFinite(active.durationSec)||active.durationSec<=0||active.durationSec>86400))active=null;
+  resetTimerAnchor();
   render();if(active)startTick();
   if('serviceWorker' in navigator && (location.protocol==='https:' || ['localhost','127.0.0.1'].includes(location.hostname))){
    navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('PWA offline not registered:',err));
