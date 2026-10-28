@@ -1,0 +1,17 @@
+name: KHOTWA English lesson tests
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  english-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify English study plan and persistence
+        run: node --test tests/english-plan.test.cjs
