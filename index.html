@@ -53,7 +53,7 @@ window.KhotwaDB = (() => {
     catch (err) { throw Error('فشل حفظ البيانات على الجهاز؛ تحقق من مساحة التخزين.'); }
   }
   async function open(){
-    if (!('indexedDB' in window)) { fallback=true; localRead(); return; }
+    if (!window.indexedDB) { fallback=true; localRead(); return; }
     try {
       db=await new Promise((resolve,reject)=>{
         const request=indexedDB.open(DB_NAME,VERSION);
