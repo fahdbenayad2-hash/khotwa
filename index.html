@@ -190,8 +190,8 @@ function atTask(id){return state.tasks.find(t=>t.id===id);}
 function backupDue(){
  const earliest=state.tasks.concat(state.projects,state.habits,state.sessions).map(x=>Date.parse(x.createdAt||x.startedAt)).filter(Number.isFinite).sort((a,b)=>a-b)[0];
  if(!earliest||Date.now()-earliest<14*86400000)return false;
- const last=Date.parse(getMeta('lastBackupAt')||getMeta('backupReminderDismissedAt')||0);
- return !Number.isFinite(last)||Date.now()-last>=14*86400000;
+ const last=Math.max(0,Date.parse(getMeta('lastBackupAt'))||0,Date.parse(getMeta('backupReminderDismissedAt'))||0);
+ return !last||Date.now()-last>=14*86400000;
 }
 function navButton(id,label,icon){return `<button class="navbtn ${page===id?'active':''}" data-action="nav" data-page="${id}" aria-current="${page===id?'page':'false'}">${ic(icon)}<span>${label}</span></button>`;}
 function shell(body){
