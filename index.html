@@ -20,7 +20,8 @@
 .backup-reminder .btn{margin-inline-start:auto}
 @media(max-width:520px){.primary-actions{flex-wrap:wrap}.primary-actions .btn.primary{flex:1;min-width:150px}}
 </style>
-  <title>خُطوة | KHOTWA v1.1</title>
+  <link rel="stylesheet" href="./english.css?v=120" />
+  <title>خُطوة | KHOTWA v1.2</title>
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -28,6 +29,7 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="modal-root"></div>
+<script src="./english.js?v=120"></script>
 <script>/* KHOTWA persistence: IndexedDB primary; localStorage fallback for unsupported/opaque origins. */
 window.KhotwaDB = (() => {
   const DB_NAME='khotwa-database';
@@ -156,6 +158,7 @@ const ic=(name,size=19)=>{
   const paths={
     today:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M8 15h3"/>',
     inbox:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h5l2 3h4l2-3h5"/>',
+    english:'<path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1 0-4h13M8 7h7M8 11h8"/>',
     projects:'<rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 9V5a2 2 0 0 1 2-2h5l2 3h7"/>',
     progress:'<path d="M3 20h18M6 16v-5M12 16V4M18 16V9"/>',
     settings:'<path d="M4 7h16M4 17h16M8 4v6M16 14v6"/>',
@@ -195,7 +198,7 @@ function backupDue(){
 }
 function navButton(id,label,icon){return `<button class="navbtn ${page===id?'active':''}" data-action="nav" data-page="${id}" aria-current="${page===id?'page':'false'}">${ic(icon)}<span>${label}</span></button>`;}
 function shell(body){
- const navs=[['today','اليوم','today'],['inbox','المهام','inbox'],['projects','مشاريعي','projects'],['progress','تقدّمي','progress'],['settings','الإعدادات','settings']];
+ const navs=[['today','اليوم','today'],['inbox','المهام','inbox'],['projects','مشاريعي','projects'],['english','الإنجليزية','english'],['progress','تقدّمي','progress'],['settings','الإعدادات','settings']];
  return `<div class="shell">
  <aside class="sidebar"><div class="brand"><span class="logo">↗</span><div><div class="brand-name">خُطوة</div><div class="brand-sub" dir="ltr">KHOTWA • YOUR PACE</div></div></div>
  <nav class="nav" aria-label="التنقل الرئيسي">${navs.map(n=>navButton(...n)).join('')}</nav>
@@ -282,9 +285,9 @@ function settingsView(){return header('ملكك وحدك','الإعدادات و
  <div class="setting-row"><div><div class="setting-title">استعادة نسخة احتياطية</div><p class="setting-desc">الاستيراد يستبدل بيانات هذا المتصفح بالكامل بعد التأكيد.</p></div><button class="btn secondary" data-action="import">${ic('upload')} استيراد</button><input class="hidden-file" type="file" id="import-file" accept=".json,application/json" /></div>
  <div class="setting-row"><div><div class="setting-title">مكان الحفظ الحالي</div><p class="setting-desc">${DB.fallback?'تخزين محلي احتياطي (localStorage).':'قاعدة بيانات المتصفح (IndexedDB).'} لا توجد مزامنة مع الحاسوب أو أجهزة أخرى.</p></div><span class="chip">${ic('shield',14)} محلي</span></div></div>
  <div class="panel settings-panel"><h2>بداية نظيفة</h2><div class="setting-row"><div><div class="setting-title">مسح جميع البيانات</div><p class="setting-desc">عملية نهائية. صدّر نسخة احتياطية قبل المتابعة إذا كنت تحتاج بياناتك.</p></div><button class="btn danger" data-action="reset">${ic('trash')} مسح البيانات</button></div></div>
- <p class="muted-small">خُطوة v1.1 — يعمل على نفس الجهاز والمتصفح. التثبيت والعمل دون إنترنت متاحان في المتصفحات الداعمة عبر HTTPS أو localhost بعد فتح الموقع أول مرة.</p>`;}
+ <p class="muted-small">خُطوة v1.2 — يعمل على نفس الجهاز والمتصفح. التثبيت والعمل دون إنترنت متاحان في المتصفحات الداعمة عبر HTTPS أو localhost بعد فتح الموقع أول مرة.</p>`;}
 function render(){
- const body=({today:todayView,inbox:inboxView,projects:projectsView,progress:progressView,settings:settingsView}[page]||todayView)();
+ const body=({today:todayView,inbox:inboxView,projects:projectsView,english:()=>window.KhotwaEnglish.view({getMeta}),progress:progressView,settings:settingsView}[page]||todayView)();
  $('#app').innerHTML=shell(body);
  drawModal();
  if(active) updateTimer();
@@ -471,6 +474,10 @@ async function clearEverything(){
  active=null;theme='dark';document.documentElement.classList.remove('light');projectDetail=null;page='today';render();notify('تم حذف بيانات هذا المتصفح.');
 }
 async function handleAction(action,node){
+ if(action.startsWith('eng-')){
+  await window.KhotwaEnglish.action(action,node,{getMeta,setMeta,render,notify});
+  return;
+ }
  const id=node.dataset.id;
  switch(action){
  case 'nav':page=node.dataset.page;projectDetail=null;closeModal();render();scrollTo(0,0);break;
@@ -508,6 +515,7 @@ async function handleAction(action,node){
  }
 }
 async function handleForm(form){
+ if(form.id==='eng-duration-form'){await window.KhotwaEnglish.submit(form,{getMeta,setMeta,render,notify});return;}
  const values=Object.fromEntries(new FormData(form).entries());
  if(form.id==='quick-form')return addQuick(values.title,'today');
  if(form.id==='inbox-form')return addQuick(values.title,'inbox');
@@ -553,6 +561,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',e=>{e.preventDefault();handleForm(e.target).catch(errorToast);});
 document.addEventListener('change',e=>{
  if(e.target.id==='import-file'){importFile(e.target.files?.[0]).catch(errorToast);e.target.value='';}
+ if(e.target.id==='eng-notes'||e.target.id==='eng-practice'){window.KhotwaEnglish.change(e.target,{getMeta,setMeta}).catch(errorToast);}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal){closeModal();}});
 // Midnight turnover: old tasks stay saved and won't become today's obligations.
